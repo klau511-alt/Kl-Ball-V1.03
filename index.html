@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Kl Ball - Official</title>
+    <style>
+        :root {
+            --primary: #ff4136;
+            --secondary: #007bff;
+            --bg-dark: #1a1a1a;
+            --victory: #2ecc40;
+            --defeat: #ff4136;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            touch-action: none;
+            height: 100dvh; width: 100vw;
+            color: white;
+        }
+
+        /* --- PANTALLAS --- */
+        #main-menu, #pause-overlay, #game-over-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+
+        #pause-overlay, #game-over-overlay { display: none; }
+
+        .menu-title { font-size: 3.5rem; font-weight: 900; letter-spacing: 5px; margin-bottom: 2rem; }
+        
+        .version-tag {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            font-size: 10px;
+            color: #444;
+            letter-spacing: 1px;
+            pointer-events: none;
+            text-transform: uppercase;
+        }
+
+        .result-title { font-size: 3rem; font-weight: 900; margin-bottom: 1.5rem; }
+        .victory-text { color: var(--victory); }
+        .defeat-text { color: var(--defeat); }
+
+        .btn {
+            background: rgba(255,255,255,0.1); border: 2px solid white; color: white;
+            padding: 15px 40px; margin: 10px; font-size: 1rem;
+            border-radius: 50px; cursor: pointer; width: 240px;
+            text-transform: uppercase; font-weight: bold; transition: 0.3s;
+        }
+        .btn:active { background: white; color: black; }
+
+        /* --- ADVERTENCIA DE ORIENTACIÓN --- */
+        #portrait-msg {
+            display: none; 
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: #111; color: white;
+            z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
+            text-align: center;
+        }
+
+        .rotation-icon {
+            width: 120px; 
+            height: 120px;
+            margin-bottom: 25px;
+            animation: tilt 2s infinite ease-in-out;
+        }
+
+        @keyframes tilt {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-90deg); }
+        }
+
+        .rotation-text {
+            font-size: 1.6rem; 
+            font-weight: bold;
+            max-width: 80%; 
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* --- MARCADOR --- */
+        .scoreboard-container {
+            display: flex; align-items: center;
+            background: rgba(30, 30, 30, 0.9); padding: 8px 30px;
+            border-radius: 0 0 20px 20px;
+            border: 2px solid #333; border-top: none;
+            margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .score-num { font-size: 36px; font-weight: 900; min-width: 50px; text-align: center; }
+        #blueScore { color: var(--secondary); }
+        #redScore { color: var(--primary); }
+        .score-divider { color: #555; font-size: 24px; padding: 0 10px; }
+
+        /* --- CANCHA --- */
+        #game-ui { display: none; flex-direction: column; align-items: center; width: 100vw; height: 100dvh; }
+        
+        canvas {
+            background-color: #808080;
+            border: 4px solid #444; 
+            max-width: 95vw; max-height: 60vh;
+            aspect-ratio: 2 / 1;
+        }
+
+        #in-game-pause-btn {
+            position: absolute; top: 10px; right: 20px;
+            background: rgba(255,255,255,0.1); border: 1px solid #555; color: #aaa;
+            padding: 6px 15px; border-radius: 20px; font-size: 12px; cursor: pointer;
+        }
+
+        /* CONTROLES */
+        #joystick-zone { position: absolute; bottom: 30px; left: 40px; width: 110px; height: 110px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+        #joystick-knob { position: absolute; width: 45px; height: 45px; background: rgba(255,255,255,0.5); border-radius: 50%; left: 32.5px; top: 32.5px; pointer-events: none; }
+        #shoot-btn { position: absolute; bottom: 30px; right: 50px; width: 90px; height: 90px; background: var(--primary); border: 4px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; user-select: none; }
+
+        /* --- MEDIA QUERIES PARA ORIENTACIÓN --- */
+        @media screen and (orientation: portrait) {
+            #game-ui, #main-menu { display: none !important; }
+            #portrait-msg { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="portrait-msg">
+        <svg class="rotation-icon" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <rect x="65" y="40" width="70" height="120" rx="10" fill="none" stroke="white" stroke-width="8"/>
+            <line x1="90" y1="145" x2="110" y2="145" stroke="white" stroke-width="4" stroke-linecap="round"/>
+            <path d="M 55 40 Q 20 40 20 80" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/>
+            <polygon points="55,25 55,55 80,40" fill="white"/>
+            <path d="M 145 160 Q 180 160 180 120" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/>
+            <polygon points="145,145 145,175 120,160" fill="white"/>
+        </svg>
+        <p class="rotation-text">Por Favor, Gira Tu<br>Teléfono Para Jugar</p>
+    </div>
+
+    <div id="main-menu">
+        <h1 class="menu-title">KL BALL</h1>
+        <button class="btn" onclick="startGame()">Jugar</button>
+        <div class="version-tag">Versión 1.03</div>
+    </div>
+
+    <div id="pause-overlay">
+        <h2 style="color: #666;">PAUSA</h2>
+        <button class="btn" onclick="togglePause()">Continuar</button>
+        <button class="btn" id="musicPauseBtn" onclick="toggleMusic()">Música: ON</button>
+    </div>
+
+    <div id="game-over-overlay">
+        <h2 id="result-title" class="result-title"></h2>
+        <button class="btn" onclick="resetGame()">Reiniciar</button>
+        <button class="btn" onclick="goToMenu()">Menú Principal</button>
+    </div>
+
+    <div id="game-ui">
+        <button id="in-game-pause-btn" onclick="togglePause()">PAUSA</button>
+        <div class="scoreboard-container">
+            <div class="score-num" id="blueScore">0</div>
+            <div class="score-divider">-</div>
+            <div class="score-num" id="redScore">0</div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div id="joystick-zone"><div id="joystick-knob"></div></div>
+        <div id="shoot-btn">PATEAR</div>
+    </div>
+
+    <audio id="bgMusic" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const blueScoreEl = document.getElementById('blueScore');
+        const redScoreEl = document.getElementById('redScore');
+        const bgMusic = document.getElementById('bgMusic');
+        
+        let gameState = "MENU";
+        let isMusicOn = true;
+        let score = { blue: 0, red: 0 };
+        const winScore = 5;
+        let turnToKick = "none";
+
+        const ball = { x: 400, y: 200, r: 10, dx: 0, dy: 0, f: 0.985 };
+        const blue = { x: 150, y: 200, r: 20, color: '#007bff', speed: 4.8 };
+        const red = { x: 650, y: 200, r: 20, color: '#ff4136', speed: 3.5 };
+
+        let moveX = 0, moveY = 0, jID = null;
+        const jZone = document.getElementById('joystick-zone');
+        const knob = document.getElementById('joystick-knob');
+
+        function startGame() {
+            document.getElementById('main-menu').style.display = 'none';
+            document.getElementById('game-over-overlay').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'flex';
+            gameState = "PLAYING";
+            if (isMusicOn) { bgMusic.volume = 0.2; bgMusic.play().catch(()=>{}); }
+            requestAnimationFrame(loop);
+        }
+
+        function togglePause() {
+            if (gameState === "PLAYING") {
+                gameState = "PAUSED";
+                document.getElementById('pause-overlay').style.display = 'flex';
+                bgMusic.pause();
+            } else if (gameState === "PAUSED") {
+                gameState = "PLAYING";
+                document.getElementById('pause-overlay').style.display = 'none';
+                if (isMusicOn) bgMusic.play();
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function toggleMusic() {
+            isMusicOn = !isMusicOn;
+            document.getElementById('musicPauseBtn').innerText = isMusicOn ? "Música: ON" : "Música: OFF";
+        }
+
+        function resetGame() {
+            score = { blue: 0, red: 0 };
+            blueScoreEl.innerText = "0";
+            redScoreEl.innerText = "0";
+            resetPos("none");
+            startGame();
+        }
+
+        function resetPos(next) {
+            ball.x = 400; ball.y = 200; ball.dx = 0; ball.dy = 0;
+            blue.x = 150; blue.y = 200; red.x = 650; red.y = 200;
+            turnToKick = next;
+        }
+
+        function goToMenu() { location.reload(); }
+
+        jZone.addEventListener('touchstart', e => { if(gameState === "PLAYING") jID = e.changedTouches[0].identifier; });
+        window.addEventListener('touchmove', e => {
+            if (gameState !== "PLAYING") return;
+            for (let t of e.touches) {
+                if (t.identifier === jID) {
+                    const r = jZone.getBoundingClientRect();
+                    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+                    const d = Math.min(45, Math.sqrt((t.clientX-cx)**2 + (t.clientY-cy)**2));
+                    const a = Math.atan2(t.clientY-cy, t.clientX-cx);
+                    moveX = Math.cos(a) * (d/45);
+                    moveY = Math.sin(a) * (d/45);
+                    knob.style.transform = `translate(${Math.cos(a)*d}px, ${Math.sin(a)*d}px)`;
+                }
+            }
+        });
+        window.addEventListener('touchend', e => {
+            for (let t of e.changedTouches) { if (t.identifier === jID) { jID = null; moveX = 0; moveY = 0; knob.style.transform = `translate(0,0)`; } }
+        });
+
+        document.getElementById('shoot-btn').addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (gameState !== "PLAYING" || turnToKick === "red") return;
+            kick(blue);
+        });
+
+        function kick(p) {
+            const d = Math.sqrt((ball.x-p.x)**2 + (ball.y-p.y)**2);
+            if(d < p.r + ball.r + 5) {
+                const a = Math.atan2(ball.y-p.y, ball.x-p.x);
+                ball.dx = Math.cos(a) * 12; ball.dy = Math.sin(a) * 12;
+                turnToKick = "none";
+            }
+        }
+
+        function update() {
+            if (gameState !== "PLAYING") return;
+
+            let nextX = blue.x + moveX * blue.speed;
+            let nextY = blue.y + moveY * blue.speed;
+            if(turnToKick === "red" && nextX > 380) nextX = 380;
+            blue.x = nextX; blue.y = nextY;
+
+            let targetX, targetY;
+            if (turnToKick === "blue") { targetX = 650; targetY = 200; }
+            else { targetX = ball.x; targetY = ball.y; }
+
+            const angAI = Math.atan2(targetY - red.y, targetX - red.x);
+            let aiNextX = red.x + Math.cos(angAI) * red.speed;
+            let aiNextY = red.y + Math.sin(angAI) * red.speed;
+            if(turnToKick === "blue" && aiNextX < 420) aiNextX = 420;
+            red.x = aiNextX; red.y = aiNextY;
+
+            if(turnToKick !== "blue" && Math.sqrt((red.x-ball.x)**2 + (red.y-ball.y)**2) < 35) kick(red);
+
+            [blue, red].forEach(p => {
+                p.x = Math.max(p.r, Math.min(800-p.r, p.x));
+                p.y = Math.max(p.r, Math.min(400-p.r, p.y));
+            });
+
+            ball.x += ball.dx; ball.y += ball.dy;
+            ball.dx *= ball.f; ball.dy *= ball.f;
+
+            if (ball.y <= ball.r) { ball.y = ball.r; ball.dy *= -0.8; }
+            if (ball.y >= 400 - ball.r) { ball.y = 400 - ball.r; ball.dy *= -0.8; }
+
+            if (ball.x <= ball.r) {
+                if (ball.y > 140 && ball.y < 260) { score.red++; resetPos("blue"); }
+                else { ball.x = ball.r; ball.dx *= -0.8; }
+            }
+            if (ball.x >= 800 - ball.r) {
+                if (ball.y > 140 && ball.y < 260) { score.blue++; resetPos("red"); }
+                else { ball.x = 800 - ball.r; ball.dx *= -0.8; }
+            }
+
+            [blue, red].forEach(p => {
+                if( (turnToKick === "blue" && p === red) || (turnToKick === "red" && p === blue) ) return;
+                const dx = ball.x - p.x, dy = ball.y - p.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if(dist < p.r + ball.r) {
+                    const a = Math.atan2(dy, dx);
+                    ball.dx = Math.cos(a) * 5; ball.dy = Math.sin(a) * 5;
+                    turnToKick = "none";
+                }
+            });
+
+            blueScoreEl.innerText = score.blue;
+            redScoreEl.innerText = score.red;
+
+            if (score.blue >= winScore || score.red >= winScore) {
+                gameState = "OVER";
+                const won = score.blue >= winScore;
+                const title = document.getElementById('result-title');
+                title.innerText = won ? "¡VICTORIA!" : "DERROTA";
+                title.className = "result-title " + (won ? "victory-text" : "defeat-text");
+                document.getElementById('game-over-overlay').style.display = 'flex';
+                bgMusic.pause();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0,0,800,400);
+            ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
+            ctx.beginPath(); ctx.arc(400,200,50,0,Math.PI*2); ctx.stroke();
+            ctx.fillStyle = "#333";
+            ctx.fillRect(0, 140, 8, 120); ctx.fillRect(792, 140, 8, 120);
+            ctx.fillStyle = "white";
+            ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+            [blue, red].forEach(p => {
+                ctx.globalAlpha = ( (turnToKick === "blue" && p === red) || (turnToKick === "red" && p === blue) ) ? 0.3 : 1.0;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function loop() {
+            if (gameState === "PLAYING") {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+        }
+    </script>
+</body>
+</html>
